@@ -1,5 +1,5 @@
 'use client';
-
+import { useState, useEffect } from 'react';
 import { Brain, LogOut, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,14 +11,28 @@ import {
 import { useAuthStore } from '@/lib/auth-store';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { authAPI } from '@/lib/api';
 
 export function Header() {
-  const { user, clearAuth } = useAuthStore();
+  const { user, refreshToken, clearAuth } = useAuthStore();
   const router = useRouter();
+  const [isMounted, setIsMounted] = useState(false);
 
-  const handleLogout = () => {
-    clearAuth();
-    router.push('/login');
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      if (refreshToken) {
+        await authAPI.logout(refreshToken);
+      }
+    } catch (error) {
+      console.error('Logout failed', error);
+    } finally {
+      clearAuth();
+      router.push('/login');
+    }
   };
 
   return (
@@ -30,12 +44,12 @@ export function Header() {
         </Link>
         
         <div className="ml-auto flex items-center space-x-4">
-          {user && (
+          {isMounted && user && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                   <User className="h-4 w-4" />
-                  <span>{user.username}</span>
+                  <span>{user.full_name}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

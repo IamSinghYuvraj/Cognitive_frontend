@@ -1,89 +1,46 @@
-import axios from 'axios';
-import { useAuthStore } from './auth-store';
-import { AuthResponse, Context, ChatMessage, ChatResponse, CreateContextRequest } from './types';
-
-const RAW_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const BASE_URL = `${RAW_BASE.replace(/\/$/, '')}/api`;
-
-export const api = axios.create({
-  baseURL: BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true,
-});
-
-// Request interceptor to add auth token
-api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
-  if (token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+import apiClient from './apiClient';
+import { AuthResponse, Context, ChatMessage, CreateContextRequest, User } from './types';
 
 // Auth API
 export const authAPI = {
-  login: (username: string, password: string): Promise<{ data: AuthResponse }> => {
-    const params = new URLSearchParams();
-    params.append('username', username);
-    params.append('password', password);
+  login: (email: string, password: string): Promise<{ data: AuthResponse }> =>
+    apiClient.post('/auth/login', { email, password }),
 
-    return api.post('/auth/token', params, {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
-  },
-  
-  signup: (username: string, email: string, password: string): Promise<{ data: AuthResponse }> =>
-    api.post('/auth/signup', { username, email, password }),
+  signup: (email: string, password: string, fullName: string): Promise<{ data: User }> =>
+    apiClient.post('/auth/signup', { email, password, full_name: fullName }),
+
+  logout: (refreshToken: string): Promise<void> =>
+    apiClient.post('/auth/logout', { refresh_token: refreshToken }),
 };
 
 // Context API
 export const contextAPI = {
-  getContexts: (): Promise<{ data: Context[] }> =>
-    api.get('/contexts/').then((res) => {
-      try {
-        console.log('Received contexts data:', res.data);
-      } catch (e) {}
-      return res;
-    }),
-  
+  getContexts: (): Promise<{ data: Context[] }> => apiClient.get('/contexts/'),
+
   getContext: (contextId: string): Promise<{ data: Context }> =>
-    api.get(`/contexts/${contextId}`).then((res) => {
-      try {
-        console.log('Received context data:', res.data);
-      } catch (e) {}
-      return res;
-    }),
-  
+    apiClient.get(`/contexts/${contextId}`),
+
   createContext: (data: CreateContextRequest): Promise<{ data: Context }> => {
     const formData = new FormData();
     formData.append('name', data.name);
     formData.append('file', data.file);
-    
-    return api.post('/contexts/', formData, {
+
+    return apiClient.post('/contexts/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
   },
-  
+
   deleteContext: (contextId: string): Promise<void> =>
-    api.delete(`/contexts/${contextId}`),
+    apiClient.delete(`/contexts/${contextId}`),
 };
 
 // Chat API
 export const chatAPI = {
-  sendMessage: (
-    contextId: string, 
-    query: string, 
-    chatHistory: ChatMessage[]
-  ): Promise<{ data: ChatResponse }> =>
-    api.post(`/chat/${contextId}`, {
-      query,
-      chat_history: chatHistory,
-    }),
+  sendMessage: (contextId: string, message: string): Promise<{ data: { response: string } }> =>
+    apiClient.post(`/chat/${contextId}`, { message }),
+
+  getChatHistory: (contextId: string): Promise<{ data: ChatMessage[] }> =>
+    apiClient.get(`/chat/${contextId}/history`),
 };

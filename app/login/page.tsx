@@ -25,13 +25,17 @@ export default function Login() {
     setIsLoading(true);
     try {
       const response = await authAPI.login(formData.email, formData.password);
-  // Log backend response body for verification
-  console.log('Login successful:', response.data);
+      // Log backend response body for verification
+      console.log('Login successful:', response.data);
 
-  const { access_token, user, refresh_token } = response.data;
+      const { access_token, refresh_token, user } = response.data;
 
-  setAuth(access_token, user, refresh_token);
-      console.log('Token stored via setAuth:', access_token);
+      if (!refresh_token) {
+        throw new Error('Refresh token not found in response');
+      }
+
+      setAuth(access_token, refresh_token, user);
+      console.log('Tokens and user stored via setAuth');
       toast({
         title: 'Success',
         description: 'Logged in successfully!',
@@ -81,13 +85,13 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="email">Email</Label>
               <Input
-                id="username"
-                type="text"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="Enter your username"
+                id="email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                placeholder="Enter your email"
                 required
               />
             </div>
