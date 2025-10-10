@@ -8,13 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuthStore } from '@/lib/auth-store';
 import { authAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Signup() {
   const [formData, setFormData] = useState({
-    username: '',
+    full_name: '',
     email: '',
     password: '',
   });
@@ -22,7 +21,6 @@ export default function Signup() {
   const [isLoading, setIsLoading] = useState(false);
 
   const router = useRouter();
-  const { setAuth } = useAuthStore();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,16 +28,12 @@ export default function Signup() {
     setIsLoading(true);
 
     try {
-      const response = await authAPI.signup(formData.username, formData.email, formData.password);
-  const { access_token, user, refresh_token } = response.data;
-
-  setAuth(access_token, user, refresh_token);
-      console.log('Token stored via setAuth (signup):', access_token);
+      await authAPI.signup(formData.email, formData.password, formData.full_name);
       toast({
         title: 'Success',
-        description: 'Account created successfully!',
+        description: 'Account created successfully! Please log in.',
       });
-      router.push('/');
+      router.push('/login');
     } catch (error: any) {
       const resp = error?.response?.data;
       let message = 'Signup failed. Please try again.';

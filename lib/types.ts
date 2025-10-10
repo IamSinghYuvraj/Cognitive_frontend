@@ -14,6 +14,7 @@ export interface Context {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  sources?: Source[];
 }
 
 export interface ChatResponse {

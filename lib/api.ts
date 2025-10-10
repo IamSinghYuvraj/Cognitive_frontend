@@ -38,9 +38,9 @@ export const contextAPI = {
 
 // Chat API
 export const chatAPI = {
-  sendMessage: (contextId: string, message: string): Promise<{ data: { response: string } }> =>
-    apiClient.post(`/chat/${contextId}`, { message }),
-
   getChatHistory: (contextId: string): Promise<{ data: ChatMessage[] }> =>
     apiClient.get(`/chat/${contextId}/history`),
+
+  clearChatHistory: (contextId: string): Promise<void> =>
+    apiClient.delete(`/chat/${contextId}/clear`),
 };

@@ -6,9 +6,8 @@ import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ChatInterface } from '@/components/ChatInterface';
-import { SourcesPanel } from '@/components/SourcesPanel';
 import { contextAPI } from '@/lib/api';
-import { Context, Source } from '@/lib/types';
+import { Context } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ChatPage() {
@@ -16,7 +15,6 @@ export default function ChatPage() {
 	const router = useRouter();
 	const contextId = params.contextId as string;
 	const [context, setContext] = useState<Context | null>(null);
-	const [sources, setSources] = useState<Source[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const { toast } = useToast();
 
@@ -82,21 +80,13 @@ export default function ChatPage() {
 					</Button>
 				</div>
 
-				<div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+				<div className="grid grid-cols-1 h-[calc(100vh-200px)]">
 					{/* Chat Interface */}
-					<div className="lg:col-span-2">
-						<div className="h-full border rounded-lg">
-							<ChatInterface
-								contextId={contextId}
-								contextName={context.name}
-								onSourcesUpdate={setSources}
-							/>
-						</div>
-					</div>
-
-					{/* Sources Panel */}
-					<div className="lg:col-span-1">
-						<SourcesPanel sources={sources} />
+					<div className="h-full border rounded-lg">
+						<ChatInterface
+							contextId={contextId}
+							contextName={context.name}
+						/>
 					</div>
 				</div>
 			</div>
