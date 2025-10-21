@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { chatAPI } from '@/lib/api';
 import { ChatMessage, Source } from '@/lib/types';
+import { streamChat } from '@/lib/chat-stream';
 import { useToast } from '@/hooks/use-toast';
 import { useAuthStore } from '@/lib/auth-store';
 
@@ -69,56 +70,45 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
     };
     setMessages((prev) => [...prev, assistantMessage]);
 
-    const { token } = useAuthStore.getState();
-    const eventSource = new EventSource(
-      `http://localhost:8000/api/chat/${contextId}?message=${encodeURIComponent(input.trim())}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
+    try {
+      await streamChat({
+        contextId,
+        message: userMessage.content,
+        onChunk: (chunk) => {
+          setMessages((prev) =>
+            prev.map((msg, index) =>
+              index === prev.length - 1
+                ? { ...msg, content: msg.content + chunk }
+                : msg
+            )
+          );
         },
-      }
-    );
-
-    eventSource.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.response) {
-        setMessages((prev) =>
-          prev.map((msg, index) =>
-            index === prev.length - 1
-              ? { ...msg, content: msg.content + data.response }
-              : msg
-          )
-        );
-      } else if (data.sources) {
-        setMessages((prev) =>
-          prev.map((msg, index) =>
-            index === prev.length - 1 ? { ...msg, sources: data.sources } : msg
-          )
-        );
-        setIsLoading(false);
-        eventSource.close();
-      } else if (data.error) {
-        toast({
-          title: 'Error',
-          description: data.error,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        eventSource.close();
-      }
-    };
-
-    eventSource.onerror = (error) => {
+        onSources: (sources) => {
+          setMessages((prev) =>
+            prev.map((msg, index) =>
+              index === prev.length - 1 ? { ...msg, sources } : msg
+            )
+          );
+        },
+        onError: (error) => {
+          toast({
+            title: 'Error',
+            description: error,
+            variant: 'destructive',
+          });
+          setMessages((prev) => prev.slice(0, -2));
+        },
+      });
+    } catch (err) {
       toast({
         title: 'Error',
-        description: 'Failed to send message. Please try again.',
+        description: err instanceof Error ? err.message : 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
       setMessages((prev) => prev.slice(0, -2));
+    } finally {
       setIsLoading(false);
-      eventSource.close();
-    };
+    }
   };
 
   const handleClearChat = async () => {

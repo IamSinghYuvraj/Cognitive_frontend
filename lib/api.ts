@@ -23,7 +23,8 @@ export const contextAPI = {
   createContext: (data: CreateContextRequest): Promise<{ data: Context }> => {
     const formData = new FormData();
     formData.append('name', data.name);
-    formData.append('file', data.file);
+    // Backend expects one or more files under the 'files' field
+    formData.append('files', data.file);
 
     return apiClient.post('/contexts/', formData, {
       headers: {
@@ -39,7 +40,7 @@ export const contextAPI = {
 // Chat API
 export const chatAPI = {
   getChatHistory: (contextId: string): Promise<{ data: ChatMessage[] }> =>
-    apiClient.get(`/chat/${contextId}/history`),
+    apiClient.get(`/chat/history/${contextId}`),
 
   clearChatHistory: (contextId: string): Promise<void> =>
     apiClient.delete(`/chat/${contextId}/clear`),
