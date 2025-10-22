@@ -53,14 +53,28 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <Brain className="h-12 w-12" />
+    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30 relative overflow-hidden">
+      {/* Background Elements */}
+      <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
+      <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+      
+      <Card className="w-full max-w-md border-border/40 shadow-2xl relative backdrop-blur-sm bg-background/95">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl blur-xl opacity-50 animate-pulse pointer-events-none" />
+              <div className="relative bg-gradient-to-br from-blue-500 to-purple-600 p-4 rounded-2xl">
+                <Brain className="h-12 w-12 text-white" />
+              </div>
+            </div>
           </div>
-          <CardTitle className="text-2xl">Join Cognitive</CardTitle>
-          <CardDescription>Create your account to get started</CardDescription>
+          <div>
+            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+              Join Cognitive
+            </CardTitle>
+            <CardDescription className="text-base mt-2">Create your account to get started</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">

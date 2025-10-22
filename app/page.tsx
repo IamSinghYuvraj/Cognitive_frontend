@@ -1,7 +1,7 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Calendar } from 'lucide-react';
+import { Plus, FileText, Trash2, Calendar, Search, TrendingUp, Sparkles, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
@@ -10,13 +10,17 @@ import { contextAPI } from '@/lib/api';
 import { Context } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { Input } from '@/components/ui/input';
+
 export default function Dashboard() {
   const [contexts, setContexts] = useState<Context[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const router = useRouter();
-  const fetchContexts = async () => {
+
+  const fetchContexts = useCallback(async () => {
     try {
       const response = await contextAPI.getContexts();
       setContexts(response.data);
@@ -29,10 +33,12 @@ export default function Dashboard() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
+
   useEffect(() => {
     fetchContexts();
-  }, []);
+  }, [fetchContexts]);
+
   const handleDeleteContext = async (contextId: string, contextName: string) => {
     if (!confirm(`Are you sure you want to delete "${contextName}"?`)) {
       return;
@@ -52,6 +58,7 @@ export default function Dashboard() {
       });
     }
   };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -61,21 +68,90 @@ export default function Dashboard() {
       minute: '2-digit',
     });
   };
+
+  const filteredContexts = contexts.filter(context =>
+    context.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <ProtectedRoute>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Dashboard</h1>
-            <p className="text-muted-foreground">
-              Manage your document contexts and start conversations
-            </p>
+      <div className="space-y-8">
+        {/* Header Section */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-3xl pointer-events-none" />
+          <div className="relative bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-transparent border border-border/40 rounded-2xl p-8">
+            <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-blue-500" />
+                  <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+                    Dashboard
+                  </h1>
+                </div>
+                <p className="text-muted-foreground text-lg">
+                  Manage your document contexts and start intelligent conversations
+                </p>
+              </div>
+              <Button 
+                onClick={() => setIsModalOpen(true)}
+                size="lg"
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg shadow-blue-500/25"
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Create Context
+              </Button>
+            </div>
           </div>
-          <Button onClick={() => setIsModalOpen(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Context
-          </Button>
         </div>
+
+        {/* Stats Cards */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="border-border/40 bg-gradient-to-br from-blue-500/5 to-transparent hover:shadow-lg hover:shadow-blue-500/10 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Contexts</CardTitle>
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{contexts.length}</div>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                Active document collections
+              </p>
+            </CardContent>
+          </Card>
+          <Card className="border-border/40 bg-gradient-to-br from-purple-500/5 to-transparent hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Total Documents</CardTitle>
+              <div className="p-2 bg-purple-500/10 rounded-lg">
+                <MessageSquare className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">
+                {contexts.reduce((acc, curr) => acc + (curr.document_count || 0), 0)}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" />
+                PDFs ready for analysis
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search contexts..."
+            className="pl-12 h-12 bg-muted/30 border-border/40 rounded-xl focus:ring-2 focus:ring-blue-500/20"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="text-center">
@@ -83,13 +159,13 @@ export default function Dashboard() {
               <p className="text-muted-foreground">Loading contexts...</p>
             </div>
           </div>
-        ) : contexts.length === 0 ? (
+        ) : filteredContexts.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">No contexts yet</CardTitle>
+              <CardTitle className="mb-2">No contexts found</CardTitle>
               <CardDescription className="text-center mb-4">
-                Create your first context by uploading a PDF document
+                {searchQuery ? `No results for "${searchQuery}"` : 'Create your first context by uploading a PDF document'}
               </CardDescription>
               <Button onClick={() => setIsModalOpen(true)}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -98,34 +174,44 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {contexts.map((context) => (
-              <Card key={context.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="pb-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {filteredContexts.map((context) => (
+              <Card key={context.id} className="group border-border/40 hover:border-blue-500/30 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                <CardHeader className="pb-3 relative">
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
-                      <CardTitle className="text-lg truncate">{context.name}</CardTitle>
-                      <CardDescription className="flex items-center mt-1">
-                        <Calendar className="mr-1 h-3 w-3" />
-                        {formatDate(context.created_at)}
-                      </CardDescription>
+                      <CardTitle className="text-lg truncate group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                        {context.name}
+                      </CardTitle>
+                      <div className="space-y-1 mt-2">
+                        <CardDescription className="flex items-center text-xs">
+                          <Calendar className="mr-1.5 h-3.5 w-3.5" />
+                          {formatDate(context.created_at)}
+                        </CardDescription>
+                        <CardDescription className="flex items-center text-xs">
+                          <FileText className="mr-1.5 h-3.5 w-3.5" />
+                          {context.document_count} {context.document_count === 1 ? 'document' : 'documents'}
+                        </CardDescription>
+                      </div>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => handleDeleteContext(context.id, context.name)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardHeader>
-                <CardContent className="pt-0">
-                  <Link href={`/chat/${context.id}`}>
-                    <Button className="w-full">
+                <CardContent className="pt-0 relative">
+                  <Button asChild className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-md group-hover:shadow-lg transition-all">
+                    <Link href={`/chat/${context.id}`}>
+                      <MessageSquare className="mr-2 h-4 w-4" />
                       Start Chat
-                    </Button>
-                  </Link>
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             ))}

@@ -1,22 +1,23 @@
-
-import { useAuthStore } from './auth-store';
+import { useAppStore } from './app-store';
 
 export const streamChat = async ({
   contextId,
   message,
+  mode = 'standard',
   onChunk,
   onSources,
   onError,
 }: {
   contextId: string;
   message: string;
+  mode?: 'standard' | 'deep';
   onChunk: (chunk: string) => void;
   onSources: (sources: any[]) => void;
   onError: (error: string) => void;
 }) => {
-  const token = useAuthStore.getState().token;
+  const token = useAppStore.getState().token;
   const response = await fetch(
-    (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + `/api/chat/${contextId}`,
+    (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000') + `/api/chat/${contextId}?mode=${mode}`,
     {
       method: 'POST',
       headers: {
@@ -28,7 +29,19 @@ export const streamChat = async ({
     }
   );
 
+  // Check for non-OK responses
+  if (!response.ok) {
+    try {
+      const errorData = await response.json();
+      onError(errorData.error || errorData.detail || 'Chat request failed');
+    } catch {
+      onError(`Request failed with status ${response.status}`);
+    }
+    return;
+  }
+
   if (!response.body) {
+    onError('No response body received');
     return;
   }
 

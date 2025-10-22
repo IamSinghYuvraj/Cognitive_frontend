@@ -2,6 +2,7 @@ export interface User {
   id: string;
   full_name: string;
   email: string;
+  avatar_url?: string;
 }
 
 export interface Context {
@@ -9,12 +10,14 @@ export interface Context {
   name: string;
   created_at: string;
   user_id: string;
+  document_count: number;
 }
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
   sources?: Source[];
+  timestamp: string;
 }
 
 export interface ChatResponse {
@@ -25,6 +28,7 @@ export interface ChatResponse {
 export interface Source {
   filename: string;
   content_preview: string;
+  download_url: string;
 }
 
 export interface AuthResponse {
@@ -36,5 +40,26 @@ export interface AuthResponse {
 
 export interface CreateContextRequest {
   name: string;
-  file: File;
+  files: File[];
+}
+
+export interface UploadResponse {
+  context_id: string;
+  processed_files: number;
+  document_ids: string[];
+}
+
+export enum DocumentStatus {
+  PENDING = "PENDING",
+  PROCESSING = "PROCESSING",
+  COMPLETED = "COMPLETED",
+  FAILED = "FAILED",
+}
+
+export interface Document {
+  id: string;
+  filename: string;
+  created_at: string;
+  status: DocumentStatus;
+  download_url: string;
 }

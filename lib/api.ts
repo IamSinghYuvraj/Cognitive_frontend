@@ -1,5 +1,5 @@
 import apiClient from './apiClient';
-import { AuthResponse, Context, ChatMessage, CreateContextRequest, User } from './types';
+import { AuthResponse, Context, ChatMessage, CreateContextRequest, User, UploadResponse } from './types';
 
 // Auth API
 export const authAPI = {
@@ -20,13 +20,15 @@ export const contextAPI = {
   getContext: (contextId: string): Promise<{ data: Context }> =>
     apiClient.get(`/contexts/${contextId}`),
 
-  createContext: (data: CreateContextRequest): Promise<{ data: Context }> => {
+  createContext: (data: CreateContextRequest): Promise<{ data: UploadResponse }> => {
     const formData = new FormData();
-    formData.append('name', data.name);
-    // Backend expects one or more files under the 'files' field
-    formData.append('files', data.file);
+    formData.append('context_name', data.name);
+    // Backend expects one or more files under the 'files' field (not 'files[]')
+    data.files.forEach((file) => {
+      formData.append('files', file);
+    });
 
-    return apiClient.post('/contexts/', formData, {
+    return apiClient.post('/documents/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -43,5 +45,5 @@ export const chatAPI = {
     apiClient.get(`/chat/history/${contextId}`),
 
   clearChatHistory: (contextId: string): Promise<void> =>
-    apiClient.delete(`/chat/${contextId}/clear`),
+    apiClient.delete(`/chat/clear/${contextId}`),
 };

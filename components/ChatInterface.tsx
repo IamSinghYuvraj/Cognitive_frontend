@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Send, Loader as Loader2, User, Bot, Trash2 } from 'lucide-react';
+import { Send, Loader as Loader2, User, Bot, Trash2, Zap, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Badge } from '@/components/ui/badge';
 import { chatAPI } from '@/lib/api';
 import { ChatMessage, Source } from '@/lib/types';
 import { streamChat } from '@/lib/chat-stream';
 import { useToast } from '@/hooks/use-toast';
-import { useAuthStore } from '@/lib/auth-store';
+import { useAppStore } from '@/lib/app-store';
 
 interface ChatInterfaceProps {
   contextId: string;
@@ -18,9 +20,16 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const {
+    messages,
+    setMessages,
+    addMessage,
+    isStreaming,
+    setStreaming,
+    clearHistory,
+  } = useAppStore();
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [mode, setMode] = useState<'standard' | 'deep'>('standard');
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -50,45 +59,48 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
     };
 
     fetchHistory();
-  }, [contextId, toast]);
+  }, [contextId, toast, setMessages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isStreaming) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
       content: input.trim(),
+      timestamp: new Date().toISOString(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage(userMessage);
     setInput('');
-    setIsLoading(true);
+    setStreaming(true);
 
     const assistantMessage: ChatMessage = {
       role: 'assistant',
       content: '',
+      timestamp: new Date().toISOString(),
     };
-    setMessages((prev) => [...prev, assistantMessage]);
+    addMessage(assistantMessage);
 
     try {
       await streamChat({
         contextId,
         message: userMessage.content,
+        mode,
         onChunk: (chunk) => {
-          setMessages((prev) =>
-            prev.map((msg, index) =>
-              index === prev.length - 1
+          useAppStore.setState((state) => ({
+            messages: state.messages.map((msg, index) =>
+              index === state.messages.length - 1
                 ? { ...msg, content: msg.content + chunk }
                 : msg
-            )
-          );
+            ),
+          }));
         },
         onSources: (sources) => {
-          setMessages((prev) =>
-            prev.map((msg, index) =>
-              index === prev.length - 1 ? { ...msg, sources } : msg
-            )
-          );
+          useAppStore.setState((state) => ({
+            messages: state.messages.map((msg, index) =>
+              index === state.messages.length - 1 ? { ...msg, sources } : msg
+            ),
+          }));
         },
         onError: (error) => {
           toast({
@@ -96,7 +108,9 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
             description: error,
             variant: 'destructive',
           });
-          setMessages((prev) => prev.slice(0, -2));
+          useAppStore.setState((state) => ({
+            messages: state.messages.slice(0, -2),
+          }));
         },
       });
     } catch (err) {
@@ -105,16 +119,18 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
         description: err instanceof Error ? err.message : 'Failed to send message. Please try again.',
         variant: 'destructive',
       });
-      setMessages((prev) => prev.slice(0, -2));
+      useAppStore.setState((state) => ({
+        messages: state.messages.slice(0, -2),
+      }));
     } finally {
-      setIsLoading(false);
+      setStreaming(false);
     }
   };
 
   const handleClearChat = async () => {
     try {
       await chatAPI.clearChatHistory(contextId);
-      setMessages([]);
+      clearHistory();
       toast({
         title: 'Success',
         description: 'Chat history cleared.',
@@ -135,19 +151,45 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
     }
   };
 
+  const formatTimestamp = (timestamp: string) => {
+    return new Date(timestamp).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="border-b p-4 flex justify-between items-center">
-        <div>
-          <h2 className="text-xl font-semibold">{contextName}</h2>
-          <p className="text-sm text-muted-foreground">
-            Ask questions about your document
-          </p>
+      <div className="border-b p-4 space-y-3">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-xl font-semibold">{contextName}</h2>
+            <p className="text-sm text-muted-foreground">
+              Ask questions about your document
+            </p>
+          </div>
+          <Button variant="outline" size="icon" onClick={handleClearChat}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
-        <Button variant="outline" size="icon" onClick={handleClearChat}>
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        
+        {/* Mode Selector */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium">Mode:</span>
+          <ToggleGroup type="single" value={mode} onValueChange={(value) => value && setMode(value as 'standard' | 'deep')}>
+            <ToggleGroupItem value="standard" aria-label="Standard mode" className="gap-2">
+              <Zap className="h-4 w-4" />
+              Standard
+              <Badge variant="secondary" className="ml-1 text-xs">1-3s</Badge>
+            </ToggleGroupItem>
+            <ToggleGroupItem value="deep" aria-label="Deep thinking mode" className="gap-2">
+              <Brain className="h-4 w-4" />
+              Deep Thinking
+              <Badge variant="secondary" className="ml-1 text-xs">5-10s</Badge>
+            </ToggleGroupItem>
+          </ToggleGroup>
+        </div>
       </div>
 
       {/* Messages */}
@@ -168,8 +210,7 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
             messages.map((message, index) => (
               <div
                 key={index}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
+                className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <Card className={`max-w-[80%] ${
                   message.role === 'user' 
                     ? 'bg-primary text-primary-foreground' 
@@ -190,10 +231,12 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
                             <h3 className="text-xs font-semibold">Sources:</h3>
                             <div className="flex flex-wrap gap-2 mt-1">
                               {message.sources.map((source, i) => (
-                                <Card key={i} className="p-2 text-xs bg-background">
-                                  <p className="font-medium">{source.filename}</p>
-                                  <p className="text-muted-foreground truncate">{source.content_preview}</p>
-                                </Card>
+                                <a key={i} href={source.download_url} download>
+                                  <Card className="p-2 text-xs bg-background hover:bg-accent">
+                                    <p className="font-medium">{source.filename}</p>
+                                    <p className="text-muted-foreground truncate">{source.content_preview}</p>
+                                  </Card>
+                                </a>
                               ))}
                             </div>
                           </div>
@@ -202,11 +245,14 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
                     </div>
                   </CardContent>
                 </Card>
+                <div className="text-xs text-muted-foreground mt-1 px-2">
+                  {formatTimestamp(message.timestamp)}
+                </div>
               </div>
             ))
           )}
           
-          {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
+          {isStreaming && messages[messages.length - 1]?.role !== 'assistant' && (
             <div className="flex justify-start">
               <Card className="bg-muted">
                 <CardContent className="p-3">
@@ -235,15 +281,15 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
             onKeyPress={handleKeyPress}
             placeholder="Ask a question about your document..."
             className="flex-1 min-h-[60px] max-h-[120px] resize-none"
-            disabled={isLoading}
+            disabled={isStreaming}
           />
           <Button
             onClick={handleSend}
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isStreaming}
             size="lg"
             className="px-6"
           >
-            {isLoading ? (
+            {isStreaming ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               <Send className="h-4 w-4" />

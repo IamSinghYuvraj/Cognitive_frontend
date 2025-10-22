@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useAuthStore } from './auth-store';
+import { useAppStore } from './app-store';
 import { User } from './types';
 
 const apiClient = axios.create({
@@ -8,7 +8,7 @@ const apiClient = axios.create({
 
 apiClient.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().token;
+    const token = useAppStore.getState().token;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -53,7 +53,7 @@ apiClient.interceptors.response.use(
       originalRequest._retry = true;
       isRefreshing = true;
 
-      const { refreshToken, setAuth, clearAuth } = useAuthStore.getState();
+      const { refreshToken, setAuth, clearAuth } = useAppStore.getState();
       if (!refreshToken) {
         clearAuth();
         window.location.href = '/login';

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuthStore } from '@/lib/auth-store';
+import { useAppStore } from '@/lib/app-store';
 
 
 interface ProtectedRouteProps {
@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAppStore();
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -19,12 +19,12 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   }, []);
 
   useEffect(() => {
-    if (isMounted && !isAuthenticated()) {
+    if (isMounted && !isAuthenticated) {
       router.push('/login');
     }
   }, [isMounted, isAuthenticated, router]);
 
-  if (!isMounted || !isAuthenticated()) {
+  if (!isMounted || !isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
