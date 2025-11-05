@@ -1,16 +1,17 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, FileText, Trash2, Calendar, Search, TrendingUp, Sparkles, MessageSquare } from 'lucide-react';
+import { Plus, FileText, Trash2, Calendar, Search, TrendingUp, Sparkles, MessageSquare, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { CreateContextModal } from '@/components/CreateContextModal';
-import { contextAPI } from '@/lib/api';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
+// Remove direct API import since we'll use fetch
 import { Context } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function Dashboard() {
   const [contexts, setContexts] = useState<Context[]>([]);
@@ -19,32 +20,47 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const { toast } = useToast();
   const router = useRouter();
+  const { isAuthenticated } = useAuth();
 
   const fetchContexts = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
+    setIsLoading(true);
     try {
-      const response = await contextAPI.getContexts();
-      setContexts(response.data);
+      const response = await fetch('/api/contexts');
+      if (!response.ok) {
+        throw new Error('Failed to fetch contexts');
+      }
+      const data = await response.json();
+      setContexts(data);
     } catch (error: any) {
+      console.error('Failed to load contexts:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load contexts',
+        description: 'Failed to load contexts. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, [isAuthenticated, toast]);
 
   useEffect(() => {
-    fetchContexts();
-  }, [fetchContexts]);
+    if (isAuthenticated) {
+      fetchContexts();
+    }
+  }, [isAuthenticated, fetchContexts]);
 
   const handleDeleteContext = async (contextId: string, contextName: string) => {
     if (!confirm(`Are you sure you want to delete "${contextName}"?`)) {
       return;
     }
     try {
-      await contextAPI.deleteContext(contextId);
+      // Use the appropriate API method to delete the context
+      await fetch(`/api/contexts/${contextId}`, {
+        method: 'DELETE',
+      });
+      
       setContexts(contexts.filter(c => c.id !== contextId));
       toast({
         title: 'Success',
@@ -74,8 +90,7 @@ export default function Dashboard() {
   );
 
   return (
-    <ProtectedRoute>
-      <div className="space-y-8">
+    <div className="space-y-8">
         {/* Header Section */}
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 rounded-3xl blur-3xl pointer-events-none" />
@@ -152,18 +167,10 @@ export default function Dashboard() {
           />
         </div>
 
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="text-center">
-              <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading contexts...</p>
-            </div>
-          </div>
-        ) : filteredContexts.length === 0 ? (
+        {filteredContexts.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />
-              <CardTitle className="mb-2">No contexts found</CardTitle>
               <CardDescription className="text-center mb-4">
                 {searchQuery ? `No results for "${searchQuery}"` : 'Create your first context by uploading a PDF document'}
               </CardDescription>
@@ -223,6 +230,5 @@ export default function Dashboard() {
           onSuccess={fetchContexts}
         />
       </div>
-    </ProtectedRoute>
   );
 }

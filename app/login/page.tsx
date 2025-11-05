@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAppStore } from '@/lib/app-store';
-import { authAPI } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator';
+import { api } from '@/lib/apiClient';
 
 // OAuth endpoints
 const OAUTH_ENDPOINTS = {
@@ -29,7 +29,7 @@ export default function Login() {
   const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setAuth } = useAppStore();
+  const { login } = useAuth();
   const { toast } = useToast();
 
   // Handle OAuth callback
@@ -40,31 +40,36 @@ export default function Login() {
     if (accessToken && refreshToken) {
       setIsProcessingOAuth(true);
       // Store tokens and redirect
-      setAuth(accessToken, refreshToken, {});
+      login(accessToken, refreshToken);
       router.push('/');
     }
-  }, [searchParams, setAuth, router]);
+  }, [searchParams, login, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isLoading) return;
     setIsLoading(true);
+    
     try {
-      const response = await authAPI.login(formData.email, formData.password);
-      console.log('Login successful:', response);
+      const response = await api.post('/auth/login', {
+        email: formData.email,
+        password: formData.password,
+      });
 
-      const { access_token, refresh_token, user } = response;
-
+      const { access_token, refresh_token } = response.data;
+      
       if (!refresh_token) {
         throw new Error('Refresh token not found in response');
       }
 
-      setAuth(access_token, refresh_token, user);
-      console.log('Tokens and user stored via setAuth');
+      // Use the login function from AuthContext
+      await login(access_token, refresh_token);
+      
       toast({
         title: 'Success',
         description: 'Logged in successfully!',
       });
+      
       router.push('/');
     } catch (error: any) {
       console.error('Login failed:', error);

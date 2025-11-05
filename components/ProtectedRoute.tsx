@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppStore } from '@/lib/app-store';
-
+import { Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,26 +11,25 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
-  const { isAuthenticated } = useAppStore();
-  const [isMounted, setIsMounted] = useState(false);
+  const { isAuthenticated, loading } = useAuth();
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isMounted && !isAuthenticated) {
-      router.push('/login');
+    if (!loading && !isAuthenticated) {
+      // Store the current path to redirect back after login
+      const currentPath = window.location.pathname + window.location.search;
+      if (currentPath !== '/login') {
+        router.push(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      } else {
+        router.push('/login');
+      }
     }
-  }, [isMounted, isAuthenticated, router]);
+  }, [isAuthenticated, loading, router]);
 
-  if (!isMounted || !isAuthenticated) {
+  if (loading || !isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="text-muted-foreground">Checking authentication...</p>
       </div>
     );
   }
