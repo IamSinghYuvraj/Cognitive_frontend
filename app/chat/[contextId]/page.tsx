@@ -6,6 +6,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { ChatInterface } from '@/components/ChatInterface';
 import { contextAPI } from '@/lib/api';
 import { Context } from '@/lib/types';
+import { useAppStore } from '@/lib/app-store';
 
 export default function ChatPage() {
   const params = useParams();
@@ -13,13 +14,14 @@ export default function ChatPage() {
   const contextId = Array.isArray(params?.contextId) ? params?.contextId[0] : (params?.contextId as string);
   const [context, setContext] = useState<Context | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const token = useAppStore((state) => state.token);
 
   useEffect(() => {
     const load = async () => {
-      if (!contextId) return;
+      if (!contextId || !token) return;
       try {
-        const { data } = await contextAPI.getContext(contextId);
-        setContext(data);
+        const contextData = await contextAPI.getContext(contextId, token);
+        setContext(contextData);
       } catch (e) {
         router.push('/');
       } finally {
@@ -27,7 +29,7 @@ export default function ChatPage() {
       }
     };
     load();
-  }, [contextId, router]);
+  }, [contextId, router, token]);
 
   return (
     <ProtectedRoute>

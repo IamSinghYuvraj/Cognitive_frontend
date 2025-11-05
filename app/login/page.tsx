@@ -1,8 +1,8 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader as Loader2, Brain } from 'lucide-react';
+import { Eye, EyeOff, Loader as Loader2, Brain, Github, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +10,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAppStore } from '@/lib/app-store';
 import { authAPI } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { Separator } from '@/components/ui/separator';
+
+// OAuth endpoints
+const OAUTH_ENDPOINTS = {
+  google: 'http://localhost:8000/api/auth/oauth/login/google',
+  github: 'http://localhost:8000/api/auth/oauth/login/github',
+  callback: 'http://localhost:3000/oauth/callback'
+};
+
 export default function Login() {
   const [formData, setFormData] = useState({
     email: '',
@@ -17,18 +26,34 @@ export default function Login() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isProcessingOAuth, setIsProcessingOAuth] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setAuth } = useAppStore();
   const { toast } = useToast();
+
+  // Handle OAuth callback
+  useEffect(() => {
+    const accessToken = searchParams?.get('access_token');
+    const refreshToken = searchParams?.get('refresh_token');
+    
+    if (accessToken && refreshToken) {
+      setIsProcessingOAuth(true);
+      // Store tokens and redirect
+      setAuth(accessToken, refreshToken, {});
+      router.push('/');
+    }
+  }, [searchParams, setAuth, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading) return;
     setIsLoading(true);
     try {
       const response = await authAPI.login(formData.email, formData.password);
-      // Log backend response body for verification
-      console.log('Login successful:', response.data);
+      console.log('Login successful:', response);
 
-      const { access_token, refresh_token, user } = response.data;
+      const { access_token, refresh_token, user } = response;
 
       if (!refresh_token) {
         throw new Error('Refresh token not found in response');
@@ -42,36 +67,33 @@ export default function Login() {
       });
       router.push('/');
     } catch (error: any) {
-      // Log the raw error to console for debugging
-      console.error('Login failed:', error?.response?.data ?? error?.message ?? error);
-
-      // Extract a user-friendly message
-      const respData = error?.response?.data;
-      let description = 'Login failed. Please try again.';
-
-      if (respData) {
-        // Backend may return { success: false, error: '...' } or { detail: '...' }
-        if (typeof respData === 'string') {
-          description = respData;
-        } else if (typeof respData === 'object') {
-          description = respData.error ?? respData.detail ?? respData.message ?? description;
-        }
-      } else if (error?.response?.status === 400 || error?.response?.status === 401) {
-        description = 'Invalid email or password.';
-      } else if (error?.message) {
-        description = error.message;
-      }
-
-      // Ensure we render only strings in UI
+      console.error('Login failed:', error);
       toast({
         title: 'Error',
-        description: String(description),
+        description: error.message || 'Login failed. Please try again.',
         variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleSocialSignIn = (provider: 'google' | 'github') => {
+    setIsLoading(true);
+    try {
+      // Redirect to the OAuth provider's login page
+      window.location.href = OAUTH_ENDPOINTS[provider];
+    } catch (error) {
+      console.error(`Error initiating ${provider} login:`, error);
+      toast({
+        title: 'Error',
+        description: `Failed to start ${provider} login`,
+        variant: 'destructive',
+      });
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30 relative overflow-hidden">
       {/* Background Elements */}
@@ -96,7 +118,54 @@ export default function Login() {
             <CardDescription className="text-base mt-2">Sign in to continue to Cognitive</CardDescription>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => handleSocialSignIn('google')}
+              disabled={isLoading || isProcessingOAuth}
+            >
+              {isProcessingOAuth ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"></path>
+                  <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"></path>
+                  <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"></path>
+                  <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"></path>
+                </svg>
+              )}
+              {isProcessingOAuth ? 'Signing in...' : 'Continue with Google'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => handleSocialSignIn('github')}
+              disabled={isLoading || isProcessingOAuth}
+            >
+              {isProcessingOAuth ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Github className="w-4 h-4 mr-2" />
+              )}
+              {isProcessingOAuth ? 'Signing in...' : 'Continue with GitHub'}
+            </Button>
+          </div>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">
+                Or continue with
+              </span>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -138,7 +207,10 @@ export default function Login() {
                   Signing in...
                 </>
               ) : (
-                'Sign In'
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Sign in with Email
+                </>
               )}
             </Button>
             <div className="text-center text-sm">
