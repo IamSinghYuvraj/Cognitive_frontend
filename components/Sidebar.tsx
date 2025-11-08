@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FileText, LogOut, User as UserIcon, Sun, Moon, Brain, Sparkles, MessageSquare } from "lucide-react";
+import { Home, FileText, LogOut, User as UserIcon, Sun, Moon, Brain, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAppStore } from "@/lib/app-store";
+import { useAuth } from "@/contexts/AuthContext";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
 import { Separator } from "@/components/ui/separator";
@@ -15,18 +15,28 @@ const navItems = [
   { name: "Contexts", href: "/contexts", icon: FileText, badge: null },
 ];
 
-export function Sidebar() {
+type SidebarProps = {
+  variant?: "desktop" | "mobile";
+  onNavigate?: () => void;
+};
+
+export function Sidebar({ variant = "desktop", onNavigate }: SidebarProps) {
   const pathname = usePathname();
-  const { user, clearAuth } = useAppStore();
+  const { user, logout } = useAuth();
   const { theme, setTheme } = useTheme();
 
-  const handleLogout = () => {
-    clearAuth();
-    window.location.href = "/login";
+  const handleLogout = async () => {
+    await logout();
+    onNavigate?.();
   };
 
+  const containerClassName =
+    variant === "desktop"
+      ? "hidden md:flex md:w-64 lg:w-72 flex-col h-screen bg-gradient-to-b from-background to-muted/20 border-r border-border/40 backdrop-blur-xl"
+      : "w-full max-w-[18rem] flex flex-col h-full bg-gradient-to-b from-background to-muted/20 border-r border-border/40";
+
   return (
-    <aside className="w-72 flex flex-col h-screen bg-gradient-to-b from-background to-muted/20 border-r border-border/40 backdrop-blur-xl">
+    <aside className={containerClassName}>
       {/* Header with Logo */}
       <div className="p-6 pb-4">
         <div className="flex items-center gap-3 mb-2">
@@ -65,6 +75,7 @@ export function Sidebar() {
                   ? "bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/20 shadow-sm" 
                   : "hover:bg-muted/50"
               }`}
+              onClick={onNavigate}
             >
               <Link href={item.href}>
                 {isActive && (
@@ -106,11 +117,11 @@ export function Sidebar() {
           <Avatar className="h-10 w-10 ring-2 ring-blue-500/20">
             <AvatarImage src={user?.avatar_url} />
             <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
-              {user?.full_name?.charAt(0).toUpperCase() || <UserIcon className="h-5 w-5" />}
+              {user?.name?.charAt(0).toUpperCase() || user?.email?.charAt(0).toUpperCase() || <UserIcon className="h-5 w-5" />}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm truncate">{user?.full_name}</p>
+            <p className="font-semibold text-sm truncate">{user?.name || 'User'}</p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
           </div>
         </div>

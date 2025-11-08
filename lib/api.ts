@@ -90,12 +90,12 @@ export const authAPI = {
 };
 
 export const contextAPI = {
-  async createContext(name: string, files: File[] = []): Promise<{ data: { context_id: string; processed_files: string[]; document_ids: string[] } }> {
+  async createContext(name: string, files: File[] = []): Promise<{ id: string; name: string; user_id: string; created_at: string; context_id: string }> {
     try {
       const formData = new FormData();
       formData.append('name', name);
       files.forEach(file => {
-        formData.append('files', file);
+        formData.append('file', file); // Note: backend expects 'file' not 'files'
       });
 
       const response = await axiosClient.post('/contexts/', formData, {
@@ -103,6 +103,10 @@ export const contextAPI = {
           'Content-Type': 'multipart/form-data',
         },
       });
+      
+      // Log the response for debugging
+      console.log('API Response Data:', response.data);
+      
       return response.data;
     } catch (error) {
       handleApiError(error);
@@ -112,9 +116,23 @@ export const contextAPI = {
 
   async getContexts(): Promise<Context[]> {
     try {
+      console.log('Making API call to GET /api/contexts/');
       const response = await axiosClient.get('/contexts/');
-      return response.data;
+      console.log('Raw API response:', response);
+      console.log('Response data:', response.data);
+      
+      // Ensure document_count is set for each context (default to 0 if not provided)
+      const contexts = Array.isArray(response.data) 
+        ? response.data.map((ctx: any) => ({
+            ...ctx,
+            document_count: ctx.document_count ?? 0
+          }))
+        : [];
+      
+      console.log('Processed contexts:', contexts);
+      return contexts;
     } catch (error) {
+      console.error('Error in getContexts API call:', error);
       handleApiError(error);
       throw error;
     }
@@ -122,9 +140,19 @@ export const contextAPI = {
 
   async getContext(id: string): Promise<Context> {
     try {
+      console.log('Fetching context:', id);
       const response = await axiosClient.get(`/contexts/${id}/`);
-      return response.data;
+      console.log('Context API response:', response.data);
+      
+      // Ensure document_count is set
+      const context = {
+        ...response.data,
+        document_count: response.data.document_count ?? 0,
+      };
+      
+      return context;
     } catch (error) {
+      console.error('Error fetching context:', error);
       handleApiError(error);
       throw error;
     }
@@ -173,8 +201,36 @@ export const chatAPI = {
 
   async getChatHistory(contextId: string): Promise<ChatMessage[]> {
     try {
-      const response = await axiosClient.get(`/chat/${contextId}/history`);
-      return response.data;
+      console.log('Fetching chat history for context:', contextId);
+      // Try both endpoint formats for compatibility
+      let response;
+      try {
+        response = await axiosClient.get(`/chat/history/${contextId}`);
+      } catch (err: any) {
+        // Fallback to alternative endpoint format
+        if (err.response?.status === 404) {
+          response = await axiosClient.get(`/chat/${contextId}/history`);
+        } else {
+          throw err;
+        }
+      }
+      
+      console.log('Chat history API response:', response.data);
+      
+      // Ensure we return an array
+      const history = Array.isArray(response.data) ? response.data : [];
+      console.log('Returning chat history:', history);
+      return history;
+    } catch (error) {
+      console.error('Error fetching chat history:', error);
+      handleApiError(error);
+      throw error;
+    }
+  },
+
+  async clearChatHistory(contextId: string): Promise<void> {
+    try {
+      await axiosClient.delete(`/chat/${contextId}/clear`);
     } catch (error) {
       handleApiError(error);
       throw error;

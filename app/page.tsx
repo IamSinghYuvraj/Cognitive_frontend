@@ -6,12 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CreateContextModal } from '@/components/CreateContextModal';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
-// Remove direct API import since we'll use fetch
 import { Context } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
+import { contextAPI } from '@/lib/api';
 
 export default function Dashboard() {
   const [contexts, setContexts] = useState<Context[]>([]);
@@ -23,23 +23,54 @@ export default function Dashboard() {
   const { isAuthenticated } = useAuth();
 
   const fetchContexts = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated) {
+      console.log('Not authenticated, skipping fetchContexts');
+      setIsLoading(false);
+      return;
+    }
     
     setIsLoading(true);
     try {
-      const response = await fetch('/api/contexts');
-      if (!response.ok) {
-        throw new Error('Failed to fetch contexts');
+      console.log('Fetching contexts from API...');
+      
+      // Use the contextAPI which handles authentication via axios interceptor
+      const contextsData = await contextAPI.getContexts();
+      
+      // CRITICAL DEBUGGING STEP:
+      console.log('API Response - Contexts from API:', contextsData);
+      console.log('Number of contexts:', contextsData?.length || 0);
+      
+      // Ensure we have an array
+      if (Array.isArray(contextsData)) {
+        setContexts(contextsData);
+        console.log('Contexts state updated with', contextsData.length, 'contexts');
+      } else {
+        console.error('Invalid response format - expected array, got:', typeof contextsData, contextsData);
+        setContexts([]);
       }
-      const data = await response.json();
-      setContexts(data);
     } catch (error: any) {
       console.error('Failed to load contexts:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+      });
+      
+      let errorMessage = 'Failed to load contexts. Please try again.';
+      if (error.response?.status === 401) {
+        errorMessage = 'Authentication failed. Please log in again.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: 'Failed to load contexts. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
+      setContexts([]);
     } finally {
       setIsLoading(false);
     }
@@ -56,20 +87,25 @@ export default function Dashboard() {
       return;
     }
     try {
-      // Use the appropriate API method to delete the context
-      await fetch(`/api/contexts/${contextId}`, {
-        method: 'DELETE',
-      });
+      // Use the API client for authenticated requests
+      const { api } = await import('@/lib/apiClient');
+      await api.delete(`/contexts/${contextId}`);
       
+      // Update local state
       setContexts(contexts.filter(c => c.id !== contextId));
+      
       toast({
         title: 'Success',
         description: 'Context deleted successfully',
       });
+      
+      // Refresh the list to ensure consistency
+      fetchContexts();
     } catch (error: any) {
+      console.error('Failed to delete context:', error);
       toast({
         title: 'Error',
-        description: 'Failed to delete context',
+        description: error.response?.data?.detail || 'Failed to delete context',
         variant: 'destructive',
       });
     }
@@ -167,7 +203,16 @@ export default function Dashboard() {
           />
         </div>
 
-        {filteredContexts.length === 0 ? (
+        {isLoading ? (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-12 w-12 text-muted-foreground mb-4 animate-spin" />
+              <CardDescription className="text-center">
+                Loading contexts...
+              </CardDescription>
+            </CardContent>
+          </Card>
+        ) : filteredContexts.length === 0 ? (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-12">
               <FileText className="h-12 w-12 text-muted-foreground mb-4" />

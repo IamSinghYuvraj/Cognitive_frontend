@@ -83,22 +83,29 @@ export function CreateContextModal({ open, onOpenChange, onSuccess }: CreateCont
       setError('Please enter a context name');
       return;
     }
-    
-    if (files.length === 0) {
-      setError('Please select at least one PDF file');
-      return;
-    }
 
     setIsLoading(true);
     setError('');
 
     try {
-      const response = await contextAPI.createContext({ name: name.trim(), files });
-      const { context_id, processed_files, document_ids } = response.data;
+      // Call the API with correct signature (name and files as separate parameters)
+      const response = await contextAPI.createContext(name.trim(), files);
       
+      // Log the response for debugging
+      console.log('API Response Data:', response);
+      
+      // Extract context_id from response (backend returns both 'id' and 'context_id')
+      const contextId = response.context_id || response.id;
+      
+      if (!contextId) {
+        throw new Error('Invalid response: context_id not found');
+      }
+      
+      // Show success message
+      const fileCount = files.length > 0 ? `${files.length} file(s) uploaded` : 'created';
       toast({
         title: 'Success',
-        description: `Context created! ${processed_files} file(s) uploaded successfully.`,
+        description: `Context "${response.name}" ${fileCount} successfully!`,
       });
       
       // Reset form
@@ -106,21 +113,25 @@ export function CreateContextModal({ open, onOpenChange, onSuccess }: CreateCont
       setFiles([]);
       setError('');
       
+      // Call onSuccess callback to refresh the contexts list
       onSuccess();
+      
+      // Close the modal
       onOpenChange(false);
       
       // Navigate to chat with new context
-      console.log('Context ID:', context_id);
-      console.log('Document IDs:', document_ids);
-      router.push(`/chat/${context_id}`);
+      console.log('Context ID:', contextId);
+      router.push(`/chat/${contextId}`);
       
     } catch (error: any) {
+      console.error('Failed to create context:', error);
+      
       // Handle backend error response
       const errorData = error.response?.data;
       let errorMessage = 'Failed to create context';
       
       if (errorData) {
-        // Backend returns {success: false, error: string, error_code: string}
+        // Backend returns {success: false, error: string, error_code: string} or {detail: string}
         errorMessage = errorData.error || errorData.detail || errorMessage;
       } else if (error.message) {
         errorMessage = error.message;
@@ -229,7 +240,7 @@ export function CreateContextModal({ open, onOpenChange, onSuccess }: CreateCont
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || files.length === 0 || !name.trim()}>
+            <Button type="submit" disabled={isLoading || !name.trim()}>
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

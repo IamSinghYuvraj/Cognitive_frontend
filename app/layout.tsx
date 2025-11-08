@@ -1,9 +1,8 @@
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { Sidebar } from '@/components/Sidebar';
 import { ThemeProvider } from '@/components/ThemeProvider';
-import { Breadcrumb } from '@/components/Breadcrumb';
 import { Providers } from '@/providers';
+import { LayoutWrapper } from '@/components/LayoutWrapper';
 
 export const metadata = {
   title: 'Cognitive - AI Document Chat',
@@ -25,18 +24,9 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            <div className="flex min-h-screen bg-gradient-to-br from-background via-background to-muted/30">
-              {/* Background Pattern */}
-              <div className="fixed inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
-              
-              <Sidebar />
-              <main className="flex-1 overflow-auto">
-                <div className="container max-w-7xl mx-auto p-6 lg:p-8 space-y-6">
-                  <Breadcrumb />
-                  {children}
-                </div>
-              </main>
-            </div>
+            <LayoutWrapper>
+              {children}
+            </LayoutWrapper>
             <Toaster />
           </ThemeProvider>
         </Providers>

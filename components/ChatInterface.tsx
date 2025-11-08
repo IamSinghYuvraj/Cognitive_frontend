@@ -8,11 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Badge } from '@/components/ui/badge';
-import { chatAPI } from '@/lib/api';
-import { ChatMessage, Source } from '@/lib/types';
-import { streamChat } from '@/lib/chat-stream';
+import { useChat } from '@/hooks/useChat';
 import { useToast } from '@/hooks/use-toast';
-import { useAppStore } from '@/lib/app-store';
 
 interface ChatInterfaceProps {
   contextId: string;
@@ -20,17 +17,9 @@ interface ChatInterfaceProps {
 }
 
 export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
-  const {
-    messages,
-    setMessages,
-    addMessage,
-    isStreaming,
-    setStreaming,
-    clearHistory,
-  } = useAppStore();
+  const { messages, isLoading, error, isStreaming, sendMessage, clearChat } = useChat(contextId);
   const [input, setInput] = useState('');
   const [mode, setMode] = useState<'standard' | 'deep'>('standard');
-  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -38,109 +27,46 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
+  // Show error toast if there's an error
   useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const response = await chatAPI.getChatHistory(contextId);
-        setMessages(response.data);
-      } catch (error) {
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch chat history.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsHistoryLoading(false);
-      }
-    };
-
-    fetchHistory();
-  }, [contextId, toast, setMessages]);
-
-  const handleSend = async () => {
-    if (!input.trim() || isStreaming) return;
-
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: input.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    addMessage(userMessage);
-    setInput('');
-    setStreaming(true);
-
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: '',
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(assistantMessage);
-
-    try {
-      await streamChat({
-        contextId,
-        message: userMessage.content,
-        mode,
-        onChunk: (chunk) => {
-          useAppStore.setState((state) => ({
-            messages: state.messages.map((msg, index) =>
-              index === state.messages.length - 1
-                ? { ...msg, content: msg.content + chunk }
-                : msg
-            ),
-          }));
-        },
-        onSources: (sources) => {
-          useAppStore.setState((state) => ({
-            messages: state.messages.map((msg, index) =>
-              index === state.messages.length - 1 ? { ...msg, sources } : msg
-            ),
-          }));
-        },
-        onError: (error) => {
-          toast({
-            title: 'Error',
-            description: error,
-            variant: 'destructive',
-          });
-          useAppStore.setState((state) => ({
-            messages: state.messages.slice(0, -2),
-          }));
-        },
-      });
-    } catch (err) {
+    if (error) {
       toast({
         title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to send message. Please try again.',
+        description: error,
         variant: 'destructive',
       });
-      useAppStore.setState((state) => ({
-        messages: state.messages.slice(0, -2),
-      }));
-    } finally {
-      setStreaming(false);
+    }
+  }, [error, toast]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isStreaming || !contextId) return;
+
+    const messageText = input.trim();
+    setInput('');
+
+    try {
+      await sendMessage(messageText, mode);
+    } catch (err) {
+      // Error is already handled in useChat hook and shown via toast
+      console.error('Error sending message:', err);
     }
   };
 
   const handleClearChat = async () => {
     try {
-      await chatAPI.clearChatHistory(contextId);
-      clearHistory();
+      await clearChat();
       toast({
         title: 'Success',
         description: 'Chat history cleared.',
       });
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to clear chat history.',
-        variant: 'destructive',
-      });
+    } catch (err) {
+      // Error is already handled in useChat hook
+      console.error('Error clearing chat:', err);
     }
   };
 
@@ -195,9 +121,12 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
       {/* Messages */}
       <ScrollArea className="flex-1 p-4">
         <div className="space-y-4">
-          {isHistoryLoading ? (
+          {isLoading ? (
             <div className="flex justify-center items-center h-full">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <div className="text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">Loading chat history...</p>
+              </div>
             </div>
           ) : messages.length === 0 ? (
             <div className="text-center py-12">
@@ -252,7 +181,8 @@ export function ChatInterface({ contextId, contextName }: ChatInterfaceProps) {
             ))
           )}
           
-          {isStreaming && messages[messages.length - 1]?.role !== 'assistant' && (
+          {/* Show thinking indicator when streaming and no assistant message yet */}
+          {isStreaming && (!messages.length || messages[messages.length - 1]?.role !== 'assistant') && (
             <div className="flex justify-start">
               <Card className="bg-muted">
                 <CardContent className="p-3">

@@ -32,18 +32,31 @@ export default function Login() {
   const { login } = useAuth();
   const { toast } = useToast();
 
-  // Handle OAuth callback
+  // Handle success message from signup
   useEffect(() => {
-    const accessToken = searchParams?.get('access_token');
-    const refreshToken = searchParams?.get('refresh_token');
-    
-    if (accessToken && refreshToken) {
-      setIsProcessingOAuth(true);
-      // Store tokens and redirect
-      login(accessToken, refreshToken);
-      router.push('/');
+    if (searchParams?.get('signup') === 'success') {
+      toast({
+        title: 'Success',
+        description: 'Account created successfully! Please log in.',
+      });
     }
-  }, [searchParams, login, router]);
+    
+    // Handle OAuth errors
+    const error = searchParams?.get('error');
+    if (error) {
+      let errorMessage = 'Authentication failed. Please try again.';
+      if (error === 'oauth_failed') {
+        errorMessage = 'OAuth authentication failed. Please try again.';
+      } else if (error === 'missing_tokens') {
+        errorMessage = 'Missing authentication tokens. Please try again.';
+      }
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    }
+  }, [searchParams, toast]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,8 +71,8 @@ export default function Login() {
 
       const { access_token, refresh_token } = response.data;
       
-      if (!refresh_token) {
-        throw new Error('Refresh token not found in response');
+      if (!access_token || !refresh_token) {
+        throw new Error('Invalid response from server');
       }
 
       // Use the login function from AuthContext
@@ -70,12 +83,24 @@ export default function Login() {
         description: 'Logged in successfully!',
       });
       
-      router.push('/');
+      // Handle redirect if provided
+      const redirectTo = searchParams?.get('redirect') || '/';
+      router.push(redirectTo);
     } catch (error: any) {
       console.error('Login failed:', error);
+      let errorMessage = 'Invalid email or password.';
+      
+      if (error.response?.status === 401) {
+        errorMessage = 'Invalid email or password.';
+      } else if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: 'Error',
-        description: error.message || 'Login failed. Please try again.',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -100,9 +125,8 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-background to-muted/30 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {/* Background Elements */}
-      <div className="absolute inset-0 bg-grid-pattern opacity-[0.02] pointer-events-none" />
       <div className="absolute top-20 left-20 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-20 right-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
       
